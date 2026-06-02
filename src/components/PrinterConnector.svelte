@@ -1,3 +1,4 @@
+<file path="src/components/PrinterConnector.svelte">
 <script lang="ts">
   import { NiimbotCapacitorBleClient, SoundSettingsItemType, Utils, type AvailableTransports } from "@mmote/niimbluelib";
   import {
@@ -26,19 +27,56 @@
   let connectionType = $state<ConnectionType>("bluetooth");
   let featureSupport = $state<AvailableTransports>({ webBluetooth: false, webSerial: false, capacitorBle: false });
 
-  const onConnectClicked = async () => {
+  const onConnectClicked = async (autoScanB1 = false) => {
     initClient(connectionType);
     connectionState.set("connecting");
 
     try {
-      if ($printerClient instanceof NiimbotCapacitorBleClient && $automation?.autoConnectDeviceId !== undefined) {
-        await $printerClient.connect({ deviceId: $automation.autoConnectDeviceId });
+      if ($printerClient instanceof NiimbotCapacitorBleClient) {
+        if (autoScanB1) {
+          try {
+            const { BleClient } = await import("@capacitor-community/bluetooth-le");
+            await BleClient.initialize();
+            let foundId: string | undefined = undefined;
+
+            await BleClient.requestLEScan({}, (result) => {
+              if (result.device.name && result.device.name.includes("B1")) {
+                foundId = result.device.deviceId;
+              }
+            });
+
+            // Wait up to 3 seconds for scan
+            for (let i = 0; i < 30; i++) {
+              await new Promise(r => setTimeout(r, 100));
+              if (foundId) break;
+            }
+            await BleClient.stopLEScan();
+
+            if (foundId) {
+              await $printerClient.connect({ deviceId: foundId });
+              return;
+            } else {
+              connectionState.set("disconnected");
+              return;
+            }
+          } catch (e) {
+            console.error("Auto-scan error", e);
+            connectionState.set("disconnected");
+            return;
+          }
+        }
+
+        if ($automation?.autoConnectDeviceId !== undefined) {
+          await $printerClient.connect({ deviceId: $automation.autoConnectDeviceId });
+        } else {
+          await $printerClient.connect();
+        }
       } else {
         await $printerClient.connect();
       }
     } catch (e) {
       connectionState.set("disconnected");
-      Toasts.error(e);
+      if (!autoScanB1) Toasts.error(e);
     }
   };
 
@@ -109,8 +147,10 @@
       connectionType = "capacitor-ble";
     }
 
-    if ($automation !== undefined && $automation.autoConnect && connectionType === "capacitor-ble") {
-      onConnectClicked();
+    if (connectionType === "capacitor-ble") {
+      onConnectClicked(true);
+    } else if ($automation !== undefined && $automation.autoConnect && connectionType === "capacitor-ble") {
+      onConnectClicked(false);
     }
   });
 </script>
@@ -279,7 +319,7 @@
       class="btn btn-primary"
       disabled={$connectionState === "connecting" ||
         (!featureSupport.capacitorBle && !featureSupport.webBluetooth && !featureSupport.webSerial)}
-      onclick={onConnectClicked}>
+      onclick={() => onConnectClicked(false)}>
       <MdIcon icon="power" />
     </button>
   {/if}
@@ -297,3 +337,4 @@
     max-width: 300px;
   }
 </style>
+</file>

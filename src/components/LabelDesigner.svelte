@@ -1,3 +1,4 @@
+<file path="src/components/LabelDesigner.svelte">
 <script lang="ts">
   import { registerPlugin, Capacitor } from "@capacitor/core";
   const PdfIntent = registerPlugin('PdfIntent');
@@ -180,8 +181,12 @@
   const pdfImageReady = async (el: HTMLCanvasElement) => {
     const img = new fabric.FabricImage(el, {
       ...OBJECT_DEFAULTS,
+      originX: "left",
+      originY: "bottom",
       left: 0,
-      top: 0,
+      top: fabricCanvas!.height,
+      scaleX: 4,
+      scaleY: 4,
     });
 
     fabricCanvas!.add(img);
@@ -361,20 +366,21 @@
           // 2. Load the base64 string directly into a Fabric Image object
           const img = await fabric.FabricImage.fromURL(base64Image);
           img.set({ 
+            originX: "left",
+            originY: "bottom",
             left: 0, 
-            top: 0, 
+            top: fabricCanvas!.height,
+            scaleX: 4,
+            scaleY: 4,
             snapAngle: OBJECT_DEFAULTS.snapAngle 
           });
-
-          // 3. Fit the image to the currently selected label size
-          CanvasUtils.fitObjectIntoCanvas(fabricCanvas!, img, 0, 0);
           
-          // 4. Add to canvas and update history
+          // 3. Add to canvas and update history
           fabricCanvas!.add(img);
           fabricCanvas!.setActiveObject(img);
           undo.push(fabricCanvas!, labelProps);
 
-          // 5. Automatically open the Print Dialog
+          // 4. Automatically open the Print Dialog
           openPreviewAndPrint();
         } catch (e) {
           Toasts.error("Failed to load PDF to canvas: " + e);
@@ -664,3 +670,5 @@
     image-rendering: pixelated;
   }
 </style>
+</script>
+</file>
